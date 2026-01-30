@@ -1,0 +1,16 @@
+# AI folder
+.agent
+.agents
+.cursor
+.gemini
+.github
+
+# AI instruction
+AGENTS.md
+
+# Build outputs
+dist/
+node_modules/
+AI委員會.app/
+
+

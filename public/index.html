@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 委員會 - Multi-Model Debate</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🏛️ AI 委員會</h1>
+      <p class="subtitle">Multi-Model Debate System</p>
+    </header>
+
+    <!-- 設定面板 -->
+    <section id="config-panel" class="panel">
+      <h2>📋 辯論設定</h2>
+      
+      <div class="form-group">
+        <label for="topic">議題 Topic</label>
+        <textarea id="topic" rows="3" placeholder="請輸入要討論的議題..."></textarea>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="max-rounds">最大辯論輪數</label>
+          <input type="number" id="max-rounds" value="3" min="1" max="10">
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="enable-web-search" checked>
+            <span>🔍 啟用網路搜尋 (事實查核)</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <h3>👥 委員會成員</h3>
+      <p class="hint">可為每位委員自訂名稱和行為指示 (System Prompt)</p>
+      <div id="members-list"></div>
+      
+      <div class="button-group">
+        <button id="add-member" class="btn btn-secondary">➕ 新增委員</button>
+        <button id="reset-default" class="btn btn-secondary">🔄 重設預設</button>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <div class="form-group">
+        <button id="start-debate" class="btn btn-primary btn-large">🚀 開始辯論</button>
+      </div>
+    </section>
+
+    <!-- 辯論進行中面板 -->
+    <section id="debate-panel" class="panel hidden">
+      <div class="debate-header">
+        <h2>⚖️ 辯論進行中</h2>
+        <div class="status-bar">
+          <span id="debate-status" class="status-badge">準備中</span>
+          <span id="round-info">第 0 / 0 輪</span>
+          <span id="web-search-badge" class="feature-badge hidden">🔍 Web Search</span>
+        </div>
+      </div>
+
+      <div class="topic-display">
+        <strong>議題：</strong><span id="current-topic"></span>
+      </div>
+
+      <div id="conversation" class="conversation"></div>
+
+      <!-- 書記官摘要 -->
+      <div id="secretary-section" class="summary-section hidden">
+        <h3>📝 書記官摘要</h3>
+        <div id="secretary-summary" class="summary-content"></div>
+      </div>
+
+      <!-- 仲裁者結論 -->
+      <div id="arbiter-section" class="summary-section hidden">
+        <h3>⚖️ 仲裁者結論</h3>
+        <div id="arbiter-conclusion" class="summary-content"></div>
+      </div>
+
+      <div class="button-group">
+        <button id="stop-debate" class="btn btn-danger">⏹️ 停止辯論</button>
+        <button id="new-debate" class="btn btn-primary hidden">🔄 新辯論</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
