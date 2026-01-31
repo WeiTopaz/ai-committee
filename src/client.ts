@@ -4,7 +4,7 @@
  */
 
 import { CopilotClient, SessionEvent } from "@github/copilot-sdk";
-import { MemberRole, CommitteeMember, CliService } from "./types.js";
+import { MemberRole, CommitteeMember, CliService, ROLE_PROMPTS } from "./types.js";
 
 interface MemberSession {
   member: CommitteeMember;
@@ -18,7 +18,9 @@ export class CommitteeClient {
   private enableWebSearch = true;
 
   constructor() {
-    this.client = new CopilotClient();
+    this.client = new CopilotClient({
+      cliArgs: ["--no-custom-instructions"],
+    });
   }
 
   async start(): Promise<void> {
@@ -62,8 +64,8 @@ export class CommitteeClient {
 
     // 根據 CLI 類型決定模型 ID
     // Gemini CLI 透過 A2C 協議調用，模型 ID 需加上 gemini: 前綴
-    const modelId = member.cli === "gemini" 
-      ? `gemini:${member.model}` 
+    const modelId = member.cli === "gemini"
+      ? `gemini:${member.model}`
       : member.model;
 
     const session = await this.client.createSession({
@@ -137,12 +139,14 @@ export class CommitteeClient {
     });
   }
 
+
+
   /**
    * 根據角色產生系統提示
    */
   private getSystemMessage(member: CommitteeMember): string {
     const baseContext = `你是「${member.name}」，參與一個 AI 委員會辯論。
-請用繁體中文回答。回答要簡潔有力，控制在 200 字以內。
+請用繁體中文回答。
 ${this.enableWebSearch ? "你可以使用網路搜尋 (web_search) 來查找事實、驗證資訊或加強論點。當你需要查證資料或引用最新資訊時，請主動使用此工具。" : ""}`;
 
     // 如果有自訂 prompt，優先使用
@@ -150,6 +154,13 @@ ${this.enableWebSearch ? "你可以使用網路搜尋 (web_search) 來查找事�
       return `${baseContext}\n\n${member.customPrompt}`;
     }
 
+    // 嘗試獲取基於名稱的專屬提示
+    const rolePrompt = ROLE_PROMPTS[member.name];
+    if (rolePrompt) {
+      return `${baseContext}\n\n${rolePrompt}`;
+    }
+
+    // 回退到基於角色的通用提示
     switch (member.role) {
       case "committee":
         return `${baseContext}
