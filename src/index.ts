@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { execSync } from "child_process";
 import { DebateController } from "./debate.js";
+import { getAppVersion } from "./version.js";
 import {
   COPILOT_MODELS,
   GEMINI_MODELS,
@@ -23,6 +24,7 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const APP_VERSION = getAppVersion();
 
 app.use(express.json());
 app.use(express.static(join(__dirname, "../public")));
@@ -130,6 +132,7 @@ app.get("/api/models", (_req: Request, res: Response) => {
   ];
 
   res.json({
+    version: APP_VERSION,
     services,
     models: ALL_MODELS,
     presets: PRESET_CONFIGS,

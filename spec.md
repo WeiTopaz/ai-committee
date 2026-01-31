@@ -98,11 +98,17 @@
 ## 5. API 規格
 
 ### GET /api/models
-回傳可用模型與預設配置。
+回傳可用模型、CLI 服務可用性、預設配置與版本。
 
 Response:
 ```
-{ "models": string[], "default": StartDebateRequest }
+{
+   "version": string,
+   "services": CliServiceConfig[],
+   "models": ModelInfo[],
+   "presets": PresetConfig[],
+   "default": StartDebateRequest
+}
 ```
 
 ### GET /api/debate/status
@@ -140,6 +146,14 @@ Response:
 Response:
 ```
 { "success": true, "message": "Debate stopped" }
+```
+
+### POST /api/shutdown
+關閉伺服器。
+
+Response:
+```
+{ "success": true }
 ```
 
 ### GET /api/events (SSE)
@@ -183,7 +197,9 @@ SSE 事件流。
 
 ## 8. 前端流程
 - 取得模型與預設配置
+- 顯示 CLI 可用性與版本
 - 由使用者設定成員與角色
+- 顯示點數預估與預設配置
 - 觸發 start -> run
 - 透過 SSE 即時更新畫面
 

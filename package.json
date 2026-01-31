@@ -1,6 +1,6 @@
 {
   "name": "ai-committee",
-  "version": "1.0.0",
+  "version": "0.0.2",
   "description": "AI Committee - Multi-model debate system using GitHub Copilot SDK",
   "type": "module",
   "main": "dist/index.js",

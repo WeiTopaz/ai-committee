@@ -6,15 +6,17 @@ Multi-Model Debate System - 多模型 AI 辯論系統
 
 - **多模型辯論**：可選擇多個 AI 模型同時參與討論
 - **多 CLI 支援**：支援 GitHub Copilot CLI 與 Gemini CLI（透過 A2C 協議）
+- **CLI 可用性偵測**：自動標示 CLI 是否可用
 - **角色系統**：
   - 委員（正方）- 支持議題的論點
   - 第十人（反方）- 根據「第十人原則」必須提出反對意見
   - 書記官 - 整理討論摘要與變化走向
   - 仲裁者 - 做出最終裁決
 - **自訂功能**：可為每位委員命名、設定個人 System Prompt
-- **預設配置**：4 種預設團隊組合，快速開始辯論
+- **預設配置**：4 種預設團隊組合（5人/7人、Copilot/Gemini），快速開始辯論
+- **角色專屬提示詞**：內建角色 Prompt 範本
 - **點數預估**：顯示辯論預估點數消耗
-- **網路搜尋**：支援 Web Search 進行事實查核
+- **網路搜尋**：可切換 Web Search 進行事實查核
 - **即時串流**：即時顯示 AI 回應
 
 ## 系統需求
@@ -148,11 +150,12 @@ AI委員會.app/
 
 ### API 介面（HTTP）
 
-- `GET /api/models`：取得可用模型與預設設定
+- `GET /api/models`：取得可用模型、預設設定與版本
 - `GET /api/debate/status`：取得目前辯論狀態
 - `POST /api/debate/start`：開始辯論（需要 topic 與成員設定）
 - `POST /api/debate/run`：執行完整辯論流程
 - `POST /api/debate/stop`：停止辯論
+- `POST /api/shutdown`：關閉伺服器
 - `GET /api/events`：SSE 事件串流
 
 ### SSE 事件
@@ -165,7 +168,7 @@ AI委員會.app/
 
 ### 運行注意事項
 
-- 目前不會自動關閉伺服器，請使用 `Ctrl+C` 或關閉執行中的終端機停止。
+- 若無使用中連線，伺服器會在閒置後自動關閉。
 - macOS App 版在使用者關閉視窗或終止 App 時會停止伺服器。
 
 ### 辯論流程概要
@@ -182,10 +185,10 @@ AI委員會.app/
 
 | 配置名稱 | 成員組成 |
 | --- | --- |
-| 免費仔5人團 (Copilot GPT-5 mini) | 2正方 + 1反方 + 1書記官 + 1仲裁者 |
-| 免費仔10人團 (Copilot GPT-5 mini) | 6正方 + 2反方 + 1書記官 + 1仲裁者 |
-| 免費仔5人團 (Gemini Flash+Pro) | 2正方(Flash) + 1反方(Flash) + 1書記官(Pro) + 1仲裁者(Pro) |
-| 免費仔10人團 (Gemini 全3 Pro) | 6正方 + 2反方 + 1書記官 + 1仲裁者 (全Pro) |
+| 5人敏捷小組 (Copilot GPT-5 mini) | 2正方 + 1反方 + 1書記官 + 1仲裁者 |
+| 7人標準委員會 (Copilot GPT-5 mini) | 3正方 + 2反方 + 1書記官 + 1仲裁者 |
+| 5人敏捷小組 (Gemini Flash+Pro) | 2正方(Flash) + 1反方(Flash) + 1書記官(Pro) + 1仲裁者(Pro) |
+| 7人標準委員會 (Gemini 全3 Pro) | 3正方 + 2反方 + 1書記官 + 1仲裁者 (全Pro) |
 
 ## 專案結構
 
@@ -237,6 +240,11 @@ ai-committee/
 - Server-Sent Events (SSE) 即時通訊
 - 純 JavaScript 前端（無框架依賴）
 - 支援 Gemini CLI 透過 A2C 協議整合
+
+## 版本與變更紀錄
+
+- 版本資訊由 `package.json` 提供，前端會顯示在標題列。
+- 變更紀錄請見 changelog.md。
 
 
 ## 授權

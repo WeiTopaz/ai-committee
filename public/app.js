@@ -29,6 +29,7 @@ const ROLE_ICONS = {
 const elements = {
   configPanel: document.getElementById("config-panel"),
   debatePanel: document.getElementById("debate-panel"),
+  appVersion: document.getElementById("app-version"),
   topic: document.getElementById("topic"),
   maxRounds: document.getElementById("max-rounds"),
   enableWebSearch: document.getElementById("enable-web-search"),
@@ -65,6 +66,9 @@ async function init() {
     allModels = data.models || [];
     presetConfigs = data.presets || [];
     defaultConfig = data.default;
+    if (elements.appVersion && data.version) {
+      elements.appVersion.textContent = `v${data.version}`;
+    }
 
     loadPresetOptions();
     loadDefaultMembers();

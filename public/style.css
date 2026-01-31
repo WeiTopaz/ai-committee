@@ -68,6 +68,12 @@ header h1 {
   font-size: 1rem;
 }
 
+.app-version {
+  margin-left: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
 /* Panel */
 .panel {
   background: var(--bg-secondary);
