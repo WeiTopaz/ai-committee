@@ -2,8 +2,10 @@
  * AI Committee Frontend
  */
 
-// 可用模型與預設配置
-let availableModels = [];
+// 可用模型、服務與預設配置
+let cliServices = [];
+let allModels = [];
+let presetConfigs = [];
 let defaultConfig = null;
 let members = [];
 let eventSource = null;
@@ -30,10 +32,15 @@ const elements = {
   topic: document.getElementById("topic"),
   maxRounds: document.getElementById("max-rounds"),
   enableWebSearch: document.getElementById("enable-web-search"),
+  presetConfig: document.getElementById("preset-config"),
   membersList: document.getElementById("members-list"),
   addMember: document.getElementById("add-member"),
   resetDefault: document.getElementById("reset-default"),
   startDebate: document.getElementById("start-debate"),
+  startBtnText: document.getElementById("start-btn-text"),
+  startBtnPoints: document.getElementById("start-btn-points"),
+  pointsEstimate: document.getElementById("points-estimate"),
+  pointsValue: document.getElementById("points-value"),
   stopDebate: document.getElementById("stop-debate"),
   newDebate: document.getElementById("new-debate"),
   debateStatus: document.getElementById("debate-status"),
@@ -54,13 +61,17 @@ async function init() {
   try {
     const response = await fetch("/api/models");
     const data = await response.json();
-    availableModels = data.models;
+    cliServices = data.services || [];
+    allModels = data.models || [];
+    presetConfigs = data.presets || [];
     defaultConfig = data.default;
 
+    loadPresetOptions();
     loadDefaultMembers();
     setupEventListeners();
     setupShutdownHandlers();
     connectSSE();
+    updatePointsEstimate();
   } catch (error) {
     console.error("Failed to initialize:", error);
     alert("初始化失敗: " + error.message);
@@ -68,15 +79,47 @@ async function init() {
 }
 
 /**
+ * 載入預設配置選項
+ */
+function loadPresetOptions() {
+  elements.presetConfig.innerHTML = '<option value="">-- 自訂 --</option>';
+  for (const preset of presetConfigs) {
+    const option = document.createElement("option");
+    option.value = preset.id;
+    option.textContent = preset.name;
+    option.title = preset.description;
+    elements.presetConfig.appendChild(option);
+  }
+}
+
+/**
  * 載入預設成員
  */
 function loadDefaultMembers() {
-  members = defaultConfig.members.map((m, i) => ({ 
-    ...m, 
+  members = defaultConfig.members.map((m, i) => ({
+    ...m,
     id: `member-${i}`,
-    customPrompt: m.customPrompt || ""
+    cli: m.cli || "copilot",
+    customPrompt: m.customPrompt || "",
   }));
   renderMembers();
+}
+
+/**
+ * 取得模型的點數標示
+ */
+function getPointsLabel(modelId, cli) {
+  const model = allModels.find((m) => m.id === modelId && m.cli === cli);
+  if (!model) return "Unknown";
+  if (model.points === "unknown") return "Unknown";
+  return `x${model.points}`;
+}
+
+/**
+ * 取得可用的模型（根據 CLI 類型）
+ */
+function getAvailableModels(cli) {
+  return allModels.filter((m) => m.cli === cli);
 }
 
 /**
@@ -100,12 +143,27 @@ function renderMembers() {
           <input type="text" class="member-name" value="${member.name}" placeholder="委員名稱" />
         </div>
         <div class="form-group">
+          <label>CLI 服務</label>
+          <select class="member-cli">
+            ${cliServices
+              .map(
+                (svc) =>
+                  `<option value="${svc.id}" ${member.cli === svc.id ? "selected" : ""} ${!svc.available ? "disabled" : ""}>
+                    ${svc.name}${!svc.available ? " (未安裝)" : ""}
+                  </option>`
+              )
+              .join("")}
+          </select>
+        </div>
+        <div class="form-group">
           <label>模型</label>
           <select class="member-model">
-            ${availableModels
+            ${getAvailableModels(member.cli)
               .map(
                 (model) =>
-                  `<option value="${model}" ${member.model === model ? "selected" : ""}>${model}</option>`
+                  `<option value="${model.id}" ${member.model === model.id ? "selected" : ""}>
+                    ${model.name} (${getPointsLabel(model.id, member.cli)})
+                  </option>`
               )
               .join("")}
           </select>
@@ -134,9 +192,23 @@ function renderMembers() {
     card.querySelector(".member-name").addEventListener("change", (e) => {
       members[index].name = e.target.value;
     });
+
+    card.querySelector(".member-cli").addEventListener("change", (e) => {
+      members[index].cli = e.target.value;
+      // 切換 CLI 後，重設模型為該 CLI 的第一個可用模型
+      const availableModels = getAvailableModels(e.target.value);
+      if (availableModels.length > 0) {
+        members[index].model = availableModels[0].id;
+      }
+      renderMembers();
+      updatePointsEstimate();
+    });
+
     card.querySelector(".member-model").addEventListener("change", (e) => {
       members[index].model = e.target.value;
+      updatePointsEstimate();
     });
+
     card.querySelector(".member-role").addEventListener("change", (e) => {
       members[index].role = e.target.value;
       card.className = `member-card ${e.target.value}`;
@@ -145,20 +217,71 @@ function renderMembers() {
         <span>${ROLE_ICONS[e.target.value]} ${ROLE_NAMES[e.target.value]}</span>
       `;
     });
+
     card.querySelector(".member-custom-prompt").addEventListener("change", (e) => {
       members[index].customPrompt = e.target.value;
     });
   });
+
+  updatePointsEstimate();
+}
+
+/**
+ * 計算點數估計
+ */
+function calculatePoints() {
+  const rounds = parseInt(elements.maxRounds.value, 10) || 3;
+  let total = 0;
+  let hasUnknown = false;
+
+  for (const member of members) {
+    const model = allModels.find((m) => m.id === member.model && m.cli === member.cli);
+    if (!model || model.points === "unknown") {
+      hasUnknown = true;
+    } else {
+      total += model.points * rounds;
+    }
+  }
+
+  if (hasUnknown) {
+    return {
+      total: "unknown",
+      display: `${members.length} 成員 × ${rounds} 輪 (含未知點數)`,
+    };
+  }
+
+  return {
+    total,
+    display: `${members.length} 成員 × ${rounds} 輪 = ${total} 點`,
+  };
+}
+
+/**
+ * 更新點數估計顯示
+ */
+function updatePointsEstimate() {
+  const estimate = calculatePoints();
+  elements.pointsValue.textContent = estimate.display;
+
+  if (estimate.total === "unknown") {
+    elements.startBtnPoints.textContent = "(含未知點數)";
+  } else {
+    elements.startBtnPoints.textContent = `(預估 ${estimate.total} 點)`;
+  }
 }
 
 /**
  * 新增成員
  */
 function addMember() {
+  const defaultCli = cliServices.find((s) => s.available)?.id || "copilot";
+  const defaultModel = getAvailableModels(defaultCli)[0]?.id || "gpt-5-mini";
+
   members.push({
     id: `member-${Date.now()}`,
     name: `委員 ${members.length + 1}`,
-    model: "gpt-5-mini",
+    model: defaultModel,
+    cli: defaultCli,
     role: "committee",
     customPrompt: "",
   });
@@ -182,20 +305,31 @@ function setupEventListeners() {
   elements.startDebate.addEventListener("click", startDebate);
   elements.stopDebate.addEventListener("click", stopDebate);
   elements.newDebate.addEventListener("click", newDebate);
+  elements.maxRounds.addEventListener("change", updatePointsEstimate);
+
+  // 預設配置選擇
+  elements.presetConfig.addEventListener("change", (e) => {
+    const presetId = e.target.value;
+    if (!presetId) return;
+
+    const preset = presetConfigs.find((p) => p.id === presetId);
+    if (preset) {
+      members = preset.members.map((m, i) => ({
+        ...m,
+        id: `member-${i}`,
+        customPrompt: m.customPrompt || "",
+      }));
+      renderMembers();
+    }
+  });
 }
 
 function setupShutdownHandlers() {
-  const sendShutdown = () => {
+  window.addEventListener("pagehide", () => {
     if (eventSource) {
       eventSource.close();
     }
-    try {
-      navigator.sendBeacon("/api/shutdown");
-    } catch (error) {
-      console.warn("Failed to send shutdown beacon:", error);
-    }
-  };
-  window.addEventListener("pagehide", sendShutdown);
+  });
 }
 
 /**
@@ -286,9 +420,12 @@ function handleStatementComplete(statement) {
  * 創建串流訊息框
  */
 function createStreamingMessage(member, round) {
-  const roleLabel = round === 0 
-    ? (member.role === "secretary" ? "摘要整理" : "最終裁決")
-    : `第 ${round} 輪`;
+  const roleLabel =
+    round === 0
+      ? member.role === "secretary"
+        ? "摘要整理"
+        : "最終裁決"
+      : `第 ${round} 輪`;
 
   const html = `
     <div class="message" id="streaming-${member.id}">
@@ -352,10 +489,11 @@ async function startDebate() {
 
   const maxRounds = parseInt(elements.maxRounds.value, 10);
   const enableWebSearch = elements.enableWebSearch.checked;
-  
+
   const memberData = members.map((m) => ({
     name: m.name,
     model: m.model,
+    cli: m.cli,
     role: m.role,
     customPrompt: m.customPrompt || "",
   }));
@@ -368,7 +506,7 @@ async function startDebate() {
 
   try {
     elements.startDebate.disabled = true;
-    elements.startDebate.textContent = "啟動中...";
+    elements.startBtnText.textContent = "啟動中...";
 
     const startRes = await fetch("/api/debate/start", {
       method: "POST",
@@ -390,7 +528,7 @@ async function startDebate() {
     elements.arbiterSection.classList.add("hidden");
     elements.stopDebate.classList.remove("hidden");
     elements.newDebate.classList.add("hidden");
-    
+
     // 顯示 web search badge
     if (enableWebSearch) {
       elements.webSearchBadge.classList.remove("hidden");
@@ -405,7 +543,7 @@ async function startDebate() {
     alert("開始辯論失敗: " + error.message);
   } finally {
     elements.startDebate.disabled = false;
-    elements.startDebate.textContent = "🚀 開始辯論";
+    elements.startBtnText.textContent = "🚀 開始辯論";
   }
 }
 

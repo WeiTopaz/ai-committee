@@ -5,12 +5,17 @@
 import express, { Request, Response } from "express";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { execSync } from "child_process";
 import { DebateController } from "./debate.js";
 import {
-  AVAILABLE_MODELS,
+  COPILOT_MODELS,
+  GEMINI_MODELS,
+  ALL_MODELS,
   DEFAULT_CONFIG,
+  PRESET_CONFIGS,
   StartDebateRequest,
   Statement,
+  CliServiceConfig,
 } from "./types.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -29,9 +34,31 @@ let debateController: DebateController | null = null;
 const sseClients: Response[] = [];
 
 let server: import("http").Server | null = null;
-let idleShutdownTimer: NodeJS.Timeout | null = null;
 let isShuttingDown = false;
-const IDLE_SHUTDOWN_MS = 10_000;
+
+/**
+ * 偵測 CLI 是否可用
+ */
+function detectCliAvailability(): { copilot: boolean; gemini: boolean } {
+  let copilot = false;
+  let gemini = false;
+
+  try {
+    execSync("which copilot", { stdio: "ignore" });
+    copilot = true;
+  } catch {
+    // Copilot CLI not found
+  }
+
+  try {
+    execSync("which gemini", { stdio: "ignore" });
+    gemini = true;
+  } catch {
+    // Gemini CLI not found
+  }
+
+  return { copilot, gemini };
+}
 
 /**
  * 發送 SSE 事件給所有客戶端
@@ -41,17 +68,6 @@ function sendSSE(event: string, data: unknown): void {
   for (const client of sseClients) {
     client.write(message);
   }
-}
-
-function scheduleIdleShutdown(): void {
-  if (idleShutdownTimer) {
-    clearTimeout(idleShutdownTimer);
-  }
-  idleShutdownTimer = setTimeout(() => {
-    if (sseClients.length === 0) {
-      void shutdownServer("no active clients");
-    }
-  }, IDLE_SHUTDOWN_MS);
 }
 
 async function shutdownServer(reason: string): Promise<void> {
@@ -79,8 +95,27 @@ async function shutdownServer(reason: string): Promise<void> {
  * GET /api/models - 獲取可用模型列表
  */
 app.get("/api/models", (_req: Request, res: Response) => {
+  const cliAvailability = detectCliAvailability();
+
+  const services: CliServiceConfig[] = [
+    {
+      id: "copilot",
+      name: "GitHub Copilot CLI",
+      available: cliAvailability.copilot,
+      models: COPILOT_MODELS,
+    },
+    {
+      id: "gemini",
+      name: "Gemini CLI (A2C)",
+      available: cliAvailability.gemini,
+      models: GEMINI_MODELS,
+    },
+  ];
+
   res.json({
-    models: AVAILABLE_MODELS,
+    services,
+    models: ALL_MODELS,
+    presets: PRESET_CONFIGS,
     default: DEFAULT_CONFIG,
   });
 });
@@ -211,18 +246,11 @@ app.get("/api/events", (req: Request, res: Response) => {
   res.write(`event: connected\ndata: {"message": "Connected to SSE"}\n\n`);
 
   sseClients.push(res);
-  if (idleShutdownTimer) {
-    clearTimeout(idleShutdownTimer);
-    idleShutdownTimer = null;
-  }
 
   req.on("close", () => {
     const index = sseClients.indexOf(res);
     if (index !== -1) {
       sseClients.splice(index, 1);
-    }
-    if (sseClients.length === 0) {
-      scheduleIdleShutdown();
     }
   });
 });
@@ -232,11 +260,6 @@ app.get("/api/events", (req: Request, res: Response) => {
  */
 app.get("/", (_req: Request, res: Response) => {
   res.sendFile(join(__dirname, "../public/index.html"));
-});
-
-app.post("/api/shutdown", async (_req: Request, res: Response) => {
-  res.json({ success: true, message: "Server shutting down" });
-  await shutdownServer("client requested");
 });
 
 // 啟動伺服器

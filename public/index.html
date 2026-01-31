@@ -33,12 +33,25 @@
             <span>🔍 啟用網路搜尋 (事實查核)</span>
           </label>
         </div>
+        <div class="form-group">
+          <label for="preset-config">預設配置</label>
+          <select id="preset-config">
+            <option value="">-- 自訂 --</option>
+          </select>
+        </div>
       </div>
 
       <div class="section-divider"></div>
 
       <h3>👥 委員會成員</h3>
       <p class="hint">可為每位委員自訂名稱和行為指示 (System Prompt)</p>
+      
+      <!-- 點數預估 -->
+      <div id="points-estimate" class="points-estimate">
+        <span class="points-label">📊 預估點數消耗：</span>
+        <span id="points-value" class="points-value">計算中...</span>
+      </div>
+      
       <div id="members-list"></div>
       
       <div class="button-group">
@@ -49,7 +62,10 @@
       <div class="section-divider"></div>
 
       <div class="form-group">
-        <button id="start-debate" class="btn btn-primary btn-large">🚀 開始辯論</button>
+        <button id="start-debate" class="btn btn-primary btn-large">
+          <span id="start-btn-text">🚀 開始辯論</span>
+          <span id="start-btn-points" class="btn-points"></span>
+        </button>
       </div>
     </section>
 

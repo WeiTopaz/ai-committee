@@ -1,9 +1,10 @@
 /**
  * CopilotClient 封裝 - 管理多個 AI Session
+ * 支援 Copilot CLI 與 Gemini CLI（透過 A2C 協議）
  */
 
 import { CopilotClient, SessionEvent } from "@github/copilot-sdk";
-import { MemberRole, CommitteeMember } from "./types.js";
+import { MemberRole, CommitteeMember, CliService } from "./types.js";
 
 interface MemberSession {
   member: CommitteeMember;
@@ -49,17 +50,24 @@ export class CommitteeClient {
 
   /**
    * 為委員會成員創建 session
+   * 根據 CLI 類型選擇不同的模型調用方式
    */
   async createMemberSession(member: CommitteeMember): Promise<void> {
     const systemContent = this.getSystemMessage(member);
 
     // 設定可用的內建工具 (web search 和 web fetch)
-    const availableTools = this.enableWebSearch 
-      ? ["web_search", "web_fetch"] 
+    const availableTools = this.enableWebSearch
+      ? ["web_search", "web_fetch"]
       : [];
 
+    // 根據 CLI 類型決定模型 ID
+    // Gemini CLI 透過 A2C 協議調用，模型 ID 需加上 gemini: 前綴
+    const modelId = member.cli === "gemini" 
+      ? `gemini:${member.model}` 
+      : member.model;
+
     const session = await this.client.createSession({
-      model: member.model,
+      model: modelId,
       streaming: true,
       systemMessage: {
         mode: "append",
