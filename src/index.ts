@@ -35,6 +35,8 @@ const sseClients: Response[] = [];
 
 let server: import("http").Server | null = null;
 let isShuttingDown = false;
+const IDLE_SHUTDOWN_DELAY_MS = 5000;
+let idleShutdownTimer: NodeJS.Timeout | null = null;
 
 /**
  * 偵測 CLI 是否可用
@@ -75,6 +77,10 @@ async function shutdownServer(reason: string): Promise<void> {
     return;
   }
   isShuttingDown = true;
+  if (idleShutdownTimer) {
+    clearTimeout(idleShutdownTimer);
+    idleShutdownTimer = null;
+  }
   console.log(`\nShutting down... (${reason})`);
   for (const client of sseClients) {
     try {
@@ -89,6 +95,17 @@ async function shutdownServer(reason: string): Promise<void> {
   }
   await new Promise<void>((resolve) => server?.close(() => resolve()));
   process.exit(0);
+}
+
+function scheduleIdleShutdown(reason: string): void {
+  if (idleShutdownTimer) {
+    clearTimeout(idleShutdownTimer);
+  }
+  idleShutdownTimer = setTimeout(() => {
+    shutdownServer(reason).catch((error) => {
+      console.error("Failed to shutdown:", error);
+    });
+  }, IDLE_SHUTDOWN_DELAY_MS);
 }
 
 /**
@@ -156,6 +173,11 @@ app.post("/api/debate/start", async (req: Request, res: Response) => {
 
     if (!request.topic) {
       return res.status(400).json({ error: "Topic is required" });
+    }
+
+    if (idleShutdownTimer) {
+      clearTimeout(idleShutdownTimer);
+      idleShutdownTimer = null;
     }
 
     // 初始化控制器
@@ -227,6 +249,9 @@ app.post("/api/debate/stop", async (_req: Request, res: Response) => {
       debateController = null;
     }
     res.json({ success: true, message: "Debate stopped" });
+    if (sseClients.length === 0) {
+      scheduleIdleShutdown("Debate stopped");
+    }
   } catch (error) {
     console.error("Failed to stop debate:", error);
     res.status(500).json({ error: String(error) });
@@ -252,7 +277,18 @@ app.get("/api/events", (req: Request, res: Response) => {
     if (index !== -1) {
       sseClients.splice(index, 1);
     }
+    if (sseClients.length === 0 && !debateController) {
+      scheduleIdleShutdown("SSE client closed");
+    }
   });
+});
+
+/**
+ * POST /api/shutdown - 關閉伺服器
+ */
+app.post("/api/shutdown", async (_req: Request, res: Response) => {
+  res.json({ success: true });
+  await shutdownServer("Client shutdown request");
 });
 
 /**

@@ -328,7 +328,9 @@ function setupShutdownHandlers() {
   window.addEventListener("pagehide", () => {
     if (eventSource) {
       eventSource.close();
+      eventSource = null;
     }
+    navigator.sendBeacon("/api/shutdown");
   });
 }
 

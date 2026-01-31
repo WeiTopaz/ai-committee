@@ -23,16 +23,19 @@ export interface ModelInfo {
 
 // Copilot CLI 可用模型與點數
 export const COPILOT_MODELS: ModelInfo[] = [
-  { id: "gpt-4.1", name: "GPT-4.1", cli: "copilot", points: 1 },
-  { id: "gpt-5", name: "GPT-5", cli: "copilot", points: 1 },
-  { id: "gpt-5-mini", name: "GPT-5 mini", cli: "copilot", points: 1 },
-  { id: "gpt-5.1", name: "GPT-5.1", cli: "copilot", points: 1 },
-  { id: "gpt-5.1-codex", name: "GPT-5.1 Codex", cli: "copilot", points: 1 },
-  { id: "gpt-5.2", name: "GPT-5.2", cli: "copilot", points: 1 },
-  { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", cli: "copilot", points: 1 },
-  { id: "claude-haiku-4.5", name: "Claude Haiku 4.5", cli: "copilot", points: 1 },
+  { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5 (default)", cli: "copilot", points: 1 },
+  {
+    id: "claude-haiku-4.5",
+    name: "Claude Haiku 4.5 (requires enablement)",
+    cli: "copilot",
+    points: 0.33,
+  },
   { id: "claude-opus-4.5", name: "Claude Opus 4.5", cli: "copilot", points: 3 },
-  { id: "gemini-3-pro-preview", name: "Gemini 3 Pro Preview", cli: "copilot", points: 1 },
+  { id: "gemini-3-pro-preview", name: "Gemini 3 Pro", cli: "copilot", points: 1 },
+  { id: "gpt-5.2-codex", name: "GPT-5.2-Codex", cli: "copilot", points: 1 },
+  { id: "gpt-5.1-codex-mini", name: "GPT-5.1-Codex-Mini", cli: "copilot", points: 0.33 },
+  { id: "gpt-5-mini", name: "GPT-5 mini", cli: "copilot", points: 0 },
+  { id: "gpt-4.1", name: "GPT-4.1", cli: "copilot", points: 0 },
 ];
 
 // Gemini CLI 可用模型（透過 A2C 協議調用）
