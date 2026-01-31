@@ -146,26 +146,26 @@ function renderMembers() {
           <label>CLI 服務</label>
           <select class="member-cli">
             ${cliServices
-              .map(
-                (svc) =>
-                  `<option value="${svc.id}" ${member.cli === svc.id ? "selected" : ""} ${!svc.available ? "disabled" : ""}>
+          .map(
+            (svc) =>
+              `<option value="${svc.id}" ${member.cli === svc.id ? "selected" : ""} ${!svc.available ? "disabled" : ""}>
                     ${svc.name}${!svc.available ? " (未安裝)" : ""}
                   </option>`
-              )
-              .join("")}
+          )
+          .join("")}
           </select>
         </div>
         <div class="form-group">
           <label>模型</label>
           <select class="member-model">
             ${getAvailableModels(member.cli)
-              .map(
-                (model) =>
-                  `<option value="${model.id}" ${member.model === model.id ? "selected" : ""}>
+          .map(
+            (model) =>
+              `<option value="${model.id}" ${member.model === model.id ? "selected" : ""}>
                     ${model.name} (${getPointsLabel(model.id, member.cli)})
                   </option>`
-              )
-              .join("")}
+          )
+          .join("")}
           </select>
         </div>
         <div class="form-group">
@@ -277,9 +277,34 @@ function addMember() {
   const defaultCli = cliServices.find((s) => s.available)?.id || "copilot";
   const defaultModel = getAvailableModels(defaultCli)[0]?.id || "gpt-5-mini";
 
+  // 取得下一個可用的委員後綴 (A-Z, 然後 1, 2, 3...)
+  const usedSuffixes = new Set(
+    members
+      .filter((m) => m.name.startsWith("委員 "))
+      .map((m) => m.name.replace("委員 ", ""))
+  );
+
+  let suffix = "";
+  // 先嘗試 A-Z
+  for (let i = 0; i < 26; i++) {
+    const letter = String.fromCharCode(65 + i); // A = 65
+    if (!usedSuffixes.has(letter)) {
+      suffix = letter;
+      break;
+    }
+  }
+  // 如果 A-Z 都用完了，使用數字
+  if (!suffix) {
+    let num = 1;
+    while (usedSuffixes.has(String(num))) {
+      num++;
+    }
+    suffix = String(num);
+  }
+
   members.push({
     id: `member-${Date.now()}`,
-    name: `委員 ${members.length + 1}`,
+    name: `委員 ${suffix}`,
     model: defaultModel,
     cli: defaultCli,
     role: "committee",
@@ -422,6 +447,10 @@ function handleStatementComplete(statement) {
  * 創建串流訊息框
  */
 function createStreamingMessage(member, round) {
+  // 取得 CLI 與模型顯示名稱
+  const cliLabel = member.cli === "gemini" ? "Gemini CLI" : "Copilot CLI";
+  const modelLabel = member.model;
+
   const roleLabel =
     round === 0
       ? member.role === "secretary"
@@ -433,7 +462,7 @@ function createStreamingMessage(member, round) {
     <div class="message" id="streaming-${member.id}">
       <div class="message-header">
         <div class="message-avatar ${member.role}">${ROLE_ICONS[member.role]}</div>
-        <span class="message-name">${member.name}</span>
+        <span class="message-name">${member.name} (${cliLabel} / ${modelLabel})</span>
         <span class="message-role">${ROLE_NAMES[member.role]}</span>
         <span class="message-round">${roleLabel}</span>
       </div>

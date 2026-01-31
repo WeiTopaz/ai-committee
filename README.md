@@ -228,8 +228,6 @@ ai-committee/
 | --- | --- |
 | Gemini 3 Flash Preview | Unknown |
 | Gemini 3 Pro Preview | Unknown |
-| Gemini 2.5 Pro | Unknown |
-| Gemini 2.5 Flash | Unknown |
 
 
 ## 技術說明

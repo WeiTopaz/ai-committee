@@ -42,8 +42,6 @@ export const COPILOT_MODELS: ModelInfo[] = [
 export const GEMINI_MODELS: ModelInfo[] = [
   { id: "gemini-3-flash-preview", name: "Gemini 3 Flash Preview", cli: "gemini", points: "unknown" },
   { id: "gemini-3-pro-preview", name: "Gemini 3 Pro Preview", cli: "gemini", points: "unknown" },
-  { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", cli: "gemini", points: "unknown" },
-  { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", cli: "gemini", points: "unknown" },
 ];
 
 // 所有可用模型
