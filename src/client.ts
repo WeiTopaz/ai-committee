@@ -4,12 +4,22 @@
  */
 
 import { CopilotClient, SessionEvent } from "@github/copilot-sdk";
+import { spawn } from "child_process";
 import { MemberRole, CommitteeMember, CliService, ROLE_PROMPTS } from "./types.js";
 
-interface MemberSession {
+type CopilotMemberSession = {
+  kind: "copilot";
   member: CommitteeMember;
   session: Awaited<ReturnType<CopilotClient["createSession"]>>;
-}
+};
+
+type GeminiMemberSession = {
+  kind: "gemini";
+  member: CommitteeMember;
+  systemMessage: string;
+};
+
+type MemberSession = CopilotMemberSession | GeminiMemberSession;
 
 export class CommitteeClient {
   private client: CopilotClient;
@@ -24,16 +34,15 @@ export class CommitteeClient {
   }
 
   async start(): Promise<void> {
-    if (!this.started) {
-      await this.client.start();
-      this.started = true;
-    }
+    // 延後到實際需要 Copilot CLI 時才啟動
   }
 
   async stop(): Promise<void> {
     for (const [id, memberSession] of this.sessions) {
       try {
-        await memberSession.session.destroy();
+        if (memberSession.kind === "copilot") {
+          await memberSession.session.destroy();
+        }
       } catch (e) {
         console.error(`Failed to destroy session ${id}:`, e);
       }
@@ -52,7 +61,7 @@ export class CommitteeClient {
 
   /**
    * 為委員會成員創建 session
-   * 根據 CLI 類型選擇不同的模型調用方式
+  * 根據 CLI 類型選擇不同的模型調用方式
    */
   async createMemberSession(member: CommitteeMember): Promise<void> {
     const systemContent = this.getSystemMessage(member);
@@ -62,23 +71,27 @@ export class CommitteeClient {
       ? ["web_search", "web_fetch"]
       : [];
 
-    // 根據 CLI 類型決定模型 ID
-    // Gemini CLI 透過 A2C 協議調用，模型 ID 需加上 gemini: 前綴
-    const modelId = member.cli === "gemini"
-      ? `gemini:${member.model}`
-      : member.model;
+    if (member.cli === "copilot") {
+      await this.ensureCopilotStarted();
+      const session = await this.client.createSession({
+        model: member.model,
+        streaming: true,
+        systemMessage: {
+          mode: "append",
+          content: systemContent,
+        },
+        availableTools: availableTools.length > 0 ? availableTools : undefined,
+      });
 
-    const session = await this.client.createSession({
-      model: modelId,
-      streaming: true,
-      systemMessage: {
-        mode: "append",
-        content: systemContent,
-      },
-      availableTools: availableTools.length > 0 ? availableTools : undefined,
+      this.sessions.set(member.id, { kind: "copilot", member, session });
+      return;
+    }
+
+    this.sessions.set(member.id, {
+      kind: "gemini",
+      member,
+      systemMessage: systemContent,
     });
-
-    this.sessions.set(member.id, { member, session });
   }
 
   /**
@@ -96,7 +109,9 @@ export class CommitteeClient {
   async destroyAllSessions(): Promise<void> {
     for (const [id, memberSession] of this.sessions) {
       try {
-        await memberSession.session.destroy();
+        if (memberSession.kind === "copilot") {
+          await memberSession.session.destroy();
+        }
       } catch (e) {
         console.error(`Failed to destroy session ${id}:`, e);
       }
@@ -115,6 +130,11 @@ export class CommitteeClient {
     const memberSession = this.sessions.get(memberId);
     if (!memberSession) {
       throw new Error(`Member session not found: ${memberId}`);
+    }
+
+    if (memberSession.kind === "gemini") {
+      const combinedPrompt = `${memberSession.systemMessage}\n\n${prompt}`.trim();
+      return this.sendToGeminiCli(memberSession.member.model, combinedPrompt, onDelta);
     }
 
     return new Promise<string>((resolve, reject) => {
@@ -208,5 +228,58 @@ ${this.enableWebSearch ? "你可以使用網路搜尋 (web_search) 來查找事�
 
   getAllMembers(): CommitteeMember[] {
     return Array.from(this.sessions.values()).map((s) => s.member);
+  }
+
+  private async ensureCopilotStarted(): Promise<void> {
+    if (!this.started) {
+      await this.client.start();
+      this.started = true;
+    }
+  }
+
+  private async sendToGeminiCli(
+    model: string,
+    prompt: string,
+    onDelta?: (chunk: string) => void
+  ): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      const args = ["-m", model, "--output-format", "text"];
+      console.info(`[CommitteeClient] Spawning gemini ${args.join(" ")}`);
+      const child = spawn("gemini", args, { stdio: ["pipe", "pipe", "pipe"] });
+
+      let content = "";
+      let errorOutput = "";
+
+      child.stdout.setEncoding("utf8");
+      child.stderr.setEncoding("utf8");
+
+      child.stdout.on("data", (chunk: string) => {
+        content += chunk;
+        if (onDelta) {
+          onDelta(chunk);
+        }
+      });
+
+      child.stderr.on("data", (chunk: string) => {
+        errorOutput += chunk;
+        console.warn(`[CommitteeClient][gemini stderr] ${chunk}`);
+      });
+
+      child.on("error", (error) => {
+        console.error("[CommitteeClient] gemini spawn error:", error);
+        reject(error);
+      });
+
+      child.on("close", (code) => {
+        if (code === 0) {
+          resolve(content.trim());
+        } else {
+          reject(new Error(errorOutput || `Gemini CLI exited with code ${code}`));
+        }
+      });
+
+      child.stdin.write(prompt);
+      child.stdin.end();
+    });
   }
 }
